@@ -1,0 +1,176 @@
+# Blackbird 2030 — Full stack on Hetzner CX33
+# Usage:
+#   cp .env.example .env
+#   docker compose -f docker-compose.opscore.yml up -d
+
+networks:
+  blackbird-net:
+    driver: bridge
+
+volumes:
+  opscore-data:
+  mongo-data:
+  certbot-conf:
+  certbot-www:
+
+services:
+
+  # ── MongoDB (for Ruflo Chat UI) ────────────────────────────────────────────
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    expose:
+      - "27017"
+    volumes:
+      - mongo-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGODB_DB_NAME:-chat-db}
+    networks:
+      - blackbird-net
+
+  # ── Ruflo MCP Bridge ───────────────────────────────────────────────────────
+  ruflo-mcp-bridge:
+    build:
+      context: ./ruflo/src/mcp-bridge
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - "3001"
+    environment:
+      PORT: "3001"
+      NODE_ENV: production
+      MCP_GROUP_INTELLIGENCE: "true"
+      MCP_GROUP_AGENTS: "true"
+      MCP_GROUP_MEMORY: "true"
+      MCP_GROUP_DEVTOOLS: "true"
+      MCP_GROUP_SECURITY: "${MCP_GROUP_SECURITY:-false}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      GOOGLE_API_KEY: "${GOOGLE_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - blackbird-net
+
+  # ── Ruflo Chat UI (SvelteKit) ──────────────────────────────────────────────
+  ruflo-chat-ui:
+    build:
+      context: ./ruflo/src/ruvocal
+      dockerfile: Dockerfile
+      args:
+        INCLUDE_DB: "false"
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      DOTENV_LOCAL: |
+        MONGODB_URL=mongodb://mongodb:27017
+        MONGODB_DB_NAME=${MONGODB_DB_NAME:-chat-db}
+        PUBLIC_APP_NAME=${BRAND_NAME:-RuFlo}
+        PUBLIC_APP_DESCRIPTION=${BRAND_DESCRIPTION:-Enterprise AI Agent Orchestration Platform}
+        PUBLIC_APP_ASSETS=chatui
+        LLM_SUMMARIZATION=true
+        ENABLE_DATA_EXPORT=true
+        ALLOW_IFRAME=true
+        OPENAI_BASE_URL=http://ruflo-mcp-bridge:3001
+        OPENAI_API_KEY=${OPENAI_API_KEY:-sk-placeholder}
+        MCP_SERVERS=[{"name":"Agents & Orchestration","url":"http://ruflo-mcp-bridge:3001/mcp/agents"},{"name":"Memory & Knowledge","url":"http://ruflo-mcp-bridge:3001/mcp/memory"},{"name":"Intelligence","url":"http://ruflo-mcp-bridge:3001/mcp/intelligence"}]
+        COOKIE_SECURE=false
+        COOKIE_SAMESITE=lax
+    depends_on:
+      mongodb:
+        condition: service_started
+      ruflo-mcp-bridge:
+        condition: service_healthy
+    networks:
+      - blackbird-net
+
+  # ── OpsCore Backend (Fastify 5 + sql.js) ──────────────────────────────────
+  opscore-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - "3003"
+    volumes:
+      - opscore-data:/data
+    environment:
+      PORT: "3003"
+      NODE_ENV: production
+      DB_PATH: /data/opscore.db
+      JWT_SECRET: "${JWT_SECRET}"
+      RUFLO_MCP_URL: http://ruflo-mcp-bridge:3001
+      VM_PROVIDER: "${VM_PROVIDER:-local}"
+      HCLOUD_TOKEN: "${HCLOUD_TOKEN:-}"
+      AGENT_DENSITY_THRESHOLD: "${AGENT_DENSITY_THRESHOLD:-10}"
+      HIGH_LOAD_THRESHOLD: "${HIGH_LOAD_THRESHOLD:-80}"
+      LOW_LOAD_THRESHOLD: "${LOW_LOAD_THRESHOLD:-20}"
+      QUEUE_DEPTH_THRESHOLD: "${QUEUE_DEPTH_THRESHOLD:-50}"
+    depends_on:
+      ruflo-mcp-bridge:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3003/health').then(r=>process.exit(r.ok?0:1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - blackbird-net
+
+  # ── OpsCore Frontend (React SPA, static) ──────────────────────────────────
+  opscore-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - "4000"
+    environment:
+      PORT: "4000"
+      API_UPSTREAM: http://opscore-backend:3003
+    networks:
+      - blackbird-net
+
+  # ── Nginx Reverse Proxy ────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/opscore.conf:/etc/nginx/nginx.conf:ro
+      - certbot-conf:/etc/letsencrypt:ro
+      - certbot-www:/var/www/certbot:ro
+    depends_on:
+      - opscore-backend
+      - opscore-frontend
+      - ruflo-chat-ui
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - blackbird-net
+
+  # ── Certbot (run manually for SSL) ────────────────────────────────────────
+  certbot:
+    image: certbot/certbot:latest
+    restart: "no"
+    volumes:
+      - certbot-conf:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    profiles:
+      - ssl
+    command: >
+      certonly --webroot -w /var/www/certbot
+      --email ${CERT_EMAIL:-admin@example.com}
+      -d ${OPSCORE_DOMAIN:-localhost}
+      --agree-tos --non-interactive
