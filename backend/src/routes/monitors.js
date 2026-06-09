@@ -61,7 +61,10 @@ export default async function monitorRoutes(fastify) {
     const monitor = monitors.getMonitor(request.params.id);
     if (!monitor) return reply.code(404).send({ error: 'Monitor not found' });
     const limit = parseInt(request.query.limit) || 100;
-    return monitors.getChecks(request.params.id, limit);
+    const rangeMap = { '24h': 86400000, '3d': 259200000, '7d': 604800000 };
+    const rangeMs = rangeMap[request.query.range];
+    const since = rangeMs ? Date.now() - rangeMs : null;
+    return monitors.getChecks(request.params.id, limit, since);
   });
 
   fastify.get('/api/monitors/:id/uptime', auth, async (request, reply) => {

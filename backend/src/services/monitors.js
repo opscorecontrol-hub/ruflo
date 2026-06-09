@@ -60,7 +60,13 @@ export function getStats() {
   };
 }
 
-export function getChecks(monitorId, limit = 100) {
+export function getChecks(monitorId, limit = 100, since = null) {
+  if (since) {
+    return getAll(
+      'SELECT * FROM checks WHERE monitor_id = ? AND checked_at > ? ORDER BY checked_at DESC LIMIT ?',
+      [monitorId, since, limit]
+    );
+  }
   return getAll(
     'SELECT * FROM checks WHERE monitor_id = ? ORDER BY checked_at DESC LIMIT ?',
     [monitorId, limit]

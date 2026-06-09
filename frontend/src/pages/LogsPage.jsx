@@ -65,9 +65,9 @@ export default function LogsPage() {
         const list = Array.isArray(data) ? data : (data.logs || data.events || []);
         const normalized = list.map((item, i) => ({
           id: item.id || item._id || `hist-${i}`,
-          event: item.event || item.type || item.eventType || 'log',
-          data: item.data || item.payload || item,
-          ts: item.ts || item.timestamp || item.createdAt || Date.now(),
+          event: item.event_type || item.event || item.type || item.eventType || 'log',
+          data: item.data || (item.payload ? (() => { try { return JSON.parse(item.payload); } catch { return item.payload; } })() : null) || item,
+          ts: item.created_at || item.ts || item.timestamp || item.createdAt || Date.now(),
         }));
         setEntries(normalized.reverse().slice(0, MAX_ENTRIES));
         setKnownTypes((prev) => {
