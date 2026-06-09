@@ -9,6 +9,8 @@ import { bus } from './events.js';
 import { startUptimeLoop } from './services/uptime.js';
 import { startScalingLoop, stopScalingLoop } from './services/swarmController.js';
 
+let uptimeTimer = null;
+
 import authRoutes from './routes/auth.js';
 import monitorRoutes from './routes/monitors.js';
 import agentRoutes from './routes/agents.js';
@@ -100,7 +102,7 @@ async function start() {
 
   await buildServer();
 
-  startUptimeLoop(60000);
+  uptimeTimer = startUptimeLoop(60000);
   startScalingLoop(30000);
 
   const port = parseInt(process.env.PORT) || 3003;
@@ -111,6 +113,7 @@ async function start() {
 process.on('SIGINT', async () => {
   fastify.log.info('Shutting down...');
   stopScalingLoop();
+  if (uptimeTimer) clearInterval(uptimeTimer);
   saveDb();
   await fastify.close();
   process.exit(0);

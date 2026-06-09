@@ -25,7 +25,6 @@ export async function initDb() {
     db = new SQL.Database();
   }
 
-  db.run('PRAGMA journal_mode=WAL;');
   db.run('PRAGMA foreign_keys=ON;');
 
   db.run(`CREATE TABLE IF NOT EXISTS users (
@@ -73,6 +72,7 @@ export async function initDb() {
   )`);
 
   saveDb();
+  setInterval(saveDb, 30000);
 }
 
 export function getDb() {

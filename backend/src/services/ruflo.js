@@ -2,10 +2,6 @@ const RUFLO_MCP_URL = process.env.RUFLO_MCP_URL || 'http://ruflo-mcp-bridge:3001
 
 async function callTool(toolName, args) {
   try {
-    const controller = new AbortController();
-    const timeout = AbortSignal.timeout(10000);
-    timeout.addEventListener('abort', () => controller.abort());
-
     const res = await fetch(`${RUFLO_MCP_URL}/mcp/agents`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
