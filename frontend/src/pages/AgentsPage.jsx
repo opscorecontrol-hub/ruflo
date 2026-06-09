@@ -76,7 +76,7 @@ export default function AgentsPage() {
     try {
       const [aRes, sRes] = await Promise.all([
         fetchWithAuth('/agents'),
-        fetchWithAuth('/swarms'),
+        fetchWithAuth('/swarm'),
       ]);
       if (aRes.ok) {
         const d = await aRes.json();
@@ -105,7 +105,7 @@ export default function AgentsPage() {
   const handleTerminate = async (id) => {
     setActionError('');
     try {
-      const res = await fetchWithAuth(`/agents/${id}/terminate`, { method: 'POST' });
+      const res = await fetchWithAuth(`/agents/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         setActionError(d.message || 'Terminate failed');

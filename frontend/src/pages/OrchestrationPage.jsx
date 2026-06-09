@@ -60,7 +60,7 @@ export default function OrchestrationPage() {
       const [tRes, pRes, sRes] = await Promise.all([
         fetchWithAuth('/orchestration/tasks'),
         fetchWithAuth('/orchestration/pipelines'),
-        fetchWithAuth('/swarms'),
+        fetchWithAuth('/swarm'),
       ]);
       if (tRes.ok) {
         const d = await tRes.json();
@@ -118,10 +118,10 @@ export default function OrchestrationPage() {
         setTriggering(false);
         return;
       }
-      const pipelineId = triggerPipeline.id || triggerPipeline._id;
-      const res = await fetchWithAuth(`/orchestration/pipelines/${pipelineId}/trigger`, {
+      const pipelineName = triggerPipeline.name || triggerPipeline.id || triggerPipeline._id;
+      const res = await fetchWithAuth('/orchestration/pipelines', {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ name: pipelineName, payload }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));

@@ -38,6 +38,18 @@ export default async function monitorRoutes(fastify) {
     return reply.code(204).send();
   });
 
+  fastify.post('/api/monitors/:id/pause', auth, async (request, reply) => {
+    const monitor = monitors.getMonitor(request.params.id);
+    if (!monitor) return reply.code(404).send({ error: 'Monitor not found' });
+    return monitors.updateMonitor(request.params.id, { status: 'paused' });
+  });
+
+  fastify.post('/api/monitors/:id/resume', auth, async (request, reply) => {
+    const monitor = monitors.getMonitor(request.params.id);
+    if (!monitor) return reply.code(404).send({ error: 'Monitor not found' });
+    return monitors.updateMonitor(request.params.id, { status: 'active' });
+  });
+
   fastify.post('/api/monitors/:id/check', auth, async (request, reply) => {
     const monitor = monitors.getMonitor(request.params.id);
     if (!monitor) return reply.code(404).send({ error: 'Monitor not found' });

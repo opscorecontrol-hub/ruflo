@@ -16,6 +16,7 @@ WORKDIR /app
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/serve_dist.js ./serve_dist.js
+COPY --from=builder /app/package.json ./package.json
 
 EXPOSE 4000
 

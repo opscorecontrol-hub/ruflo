@@ -83,7 +83,7 @@ export default function VMsPage() {
     try {
       const [vRes, sRes] = await Promise.all([
         fetchWithAuth('/vms'),
-        fetchWithAuth('/swarms'),
+        fetchWithAuth('/swarm'),
       ]);
       if (vRes.ok) {
         const d = await vRes.json();

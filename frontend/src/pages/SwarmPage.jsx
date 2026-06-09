@@ -53,7 +53,7 @@ export default function SwarmPage() {
 
   const loadSwarms = useCallback(async () => {
     try {
-      const res = await fetchWithAuth('/swarms');
+      const res = await fetchWithAuth('/swarm');
       if (!res.ok) { setError('Failed to load swarms'); return; }
       const data = await res.json();
       setSwarms(Array.isArray(data) ? data : (data.swarms || []));
@@ -77,7 +77,7 @@ export default function SwarmPage() {
     setCreating(true);
     setActionError('');
     try {
-      const res = await fetchWithAuth('/swarms', {
+      const res = await fetchWithAuth('/swarm', {
         method: 'POST',
         body: JSON.stringify(newSwarm),
       });
@@ -100,10 +100,10 @@ export default function SwarmPage() {
     setActionError('');
     try {
       let method = 'POST';
-      let endpoint = `/swarms/${id}/${action}`;
+      let endpoint = `/swarm/${id}/${action}`;
       if (action === 'delete') {
         method = 'DELETE';
-        endpoint = `/swarms/${id}`;
+        endpoint = `/swarm/${id}`;
       }
       const res = await fetchWithAuth(endpoint, { method });
       if (!res.ok) {
