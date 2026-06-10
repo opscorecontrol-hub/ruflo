@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { flushSync } from 'react-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Login() {
   const { login } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -24,8 +26,12 @@ export default function Login() {
         setError(data.message || data.error || 'Login failed');
         return;
       }
-      // App.jsx route guard redirects to /dashboard once user state is set
-      login(data.token, data.user);
+      // flushSync forces the React state update to apply synchronously so
+      // ProtectedRoute sees the user before navigate('/dashboard') renders it.
+      flushSync(() => {
+        login(data.token, data.user);
+      });
+      navigate('/dashboard', { replace: true });
     } catch {
       setError('Network error — please try again');
     } finally {
