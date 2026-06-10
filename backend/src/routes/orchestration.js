@@ -25,6 +25,25 @@ export default async function orchestrationRoutes(fastify) {
     }
   });
 
+  fastify.get('/api/orchestration/pipelines/:runId', auth, async (request, reply) => {
+    try {
+      const status = await ruflo.getPipelineStatus(request.params.runId);
+      if (!status) return reply.code(404).send({ error: 'Pipeline run not found' });
+      return status;
+    } catch (err) {
+      return reply.code(500).send({ error: err.message });
+    }
+  });
+
+  fastify.delete('/api/orchestration/pipelines/:runId', auth, async (request, reply) => {
+    try {
+      await ruflo.cancelPipeline(request.params.runId);
+      return reply.code(204).send();
+    } catch (err) {
+      return reply.code(500).send({ error: err.message });
+    }
+  });
+
   fastify.get('/api/orchestration/tasks', auth, async (request) => {
     const { swarm_id, status } = request.query;
     let sql = 'SELECT * FROM tasks WHERE 1=1';

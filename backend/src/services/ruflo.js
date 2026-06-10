@@ -70,3 +70,11 @@ export async function listActivePipelines() {
     return [];
   }
 }
+
+export async function getPipelineStatus(runId) {
+  return callTool('ruflo__agent_status', { agentId: runId });
+}
+
+export async function cancelPipeline(runId) {
+  return callTool('ruflo__agent_terminate', { agentId: runId });
+}
