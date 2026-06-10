@@ -162,3 +162,7 @@ hive-mind-prompt-*.txt
 .env.*
 !.env.example
 !.env.*.example
+
+# OpsCore / Blackbird 2030 — local runtime artifacts
+data/
+*.db
