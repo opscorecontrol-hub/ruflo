@@ -6,7 +6,15 @@ export default async function swarmRoutes(fastify) {
   const auth = { onRequest: [fastify.authenticate] };
 
   fastify.get('/api/swarm', auth, async (request) => {
-    return getAll('SELECT * FROM swarms WHERE user_id = ? ORDER BY created_at DESC', [request.user.id]);
+    return getAll(
+      `SELECT s.*,
+        (SELECT COUNT(*) FROM agents WHERE swarm_id = s.id AND status != 'terminated') AS agent_count,
+        (SELECT COUNT(*) FROM vms   WHERE swarm_id = s.id AND status != 'terminated') AS vm_count
+       FROM swarms s
+       WHERE s.user_id = ?
+       ORDER BY s.created_at DESC`,
+      [request.user.id]
+    );
   });
 
   fastify.post('/api/swarm', auth, async (request, reply) => {
@@ -64,6 +72,25 @@ export default async function swarmRoutes(fastify) {
     if (!swarm) return reply.code(404).send({ error: 'Swarm not found' });
     await swarmController.deactivateSwarm(request.params.id);
     return getOne('SELECT * FROM swarms WHERE id = ?', [request.params.id]);
+  });
+
+  fastify.post('/api/swarm/:id/task', auth, async (request, reply) => {
+    const swarm = getOne('SELECT * FROM swarms WHERE id = ?', [request.params.id]);
+    if (!swarm) return reply.code(404).send({ error: 'Swarm not found' });
+    const { title, description, payload } = request.body || {};
+    if (!title) return reply.code(400).send({ error: 'title required' });
+
+    const id = nanoid();
+    const created_at = Date.now();
+    await writeQueue(() => {
+      runQuery(
+        'INSERT INTO tasks (id, swarm_id, title, description, status, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [id, request.params.id, title, description || null, 'queued', payload ? JSON.stringify(payload) : '{}', created_at]
+      );
+    });
+
+    const task = getOne('SELECT * FROM tasks WHERE id = ?', [id]);
+    return reply.code(201).send(task);
   });
 
   fastify.get('/api/swarm/:id/events', auth, async (request, reply) => {
