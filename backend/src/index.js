@@ -110,14 +110,17 @@ async function start() {
   fastify.log.info(`OpsCore backend running on port ${port}`);
 }
 
-process.on('SIGINT', async () => {
+async function shutdown() {
   fastify.log.info('Shutting down...');
   stopScalingLoop();
   if (uptimeTimer) clearInterval(uptimeTimer);
   saveDb();
   await fastify.close();
   process.exit(0);
-});
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 start().catch(err => {
   console.error('Startup failed:', err);
