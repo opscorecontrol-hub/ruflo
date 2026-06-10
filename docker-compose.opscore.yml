@@ -113,7 +113,7 @@ services:
       QUEUE_DEPTH_THRESHOLD: "${QUEUE_DEPTH_THRESHOLD:-50}"
     depends_on:
       ruflo-mcp-bridge:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3003/health').then(r=>process.exit(r.ok?0:1))"]
       interval: 30s
@@ -149,9 +149,12 @@ services:
       - certbot-conf:/etc/letsencrypt:ro
       - certbot-www:/var/www/certbot:ro
     depends_on:
-      - opscore-backend
-      - opscore-frontend
-      - ruflo-chat-ui
+      opscore-backend:
+        condition: service_healthy
+      opscore-frontend:
+        condition: service_started
+      ruflo-chat-ui:
+        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/health"]
       interval: 30s
