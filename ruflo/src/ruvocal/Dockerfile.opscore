@@ -49,7 +49,7 @@ COPY --link --chown=1000 . .
 
 # Start a mock OpenAI-compatible server so npm run build does not crash when
 # it tries to fetch the models list from OPENAI_BASE_URL at build time.
-RUN node -e "require('http').createServer(function(q,s){s.setHeader('Content-Type','application/json');s.end(JSON.stringify({object:'list',data:[]}));}).listen(3001,'127.0.0.1');" & \
+RUN node -e "var m=JSON.stringify({object:'list',data:[{id:'default',object:'model',created:1700000000,owned_by:'ruflo'}]});require('http').createServer(function(q,s){s.setHeader('Content-Type','application/json');s.end(m);}).listen(3001,'127.0.0.1');" & \
     sleep 2 && \
     git config --global --add safe.directory /app && \
     npm run build
