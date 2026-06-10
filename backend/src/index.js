@@ -54,7 +54,13 @@ async function buildServer() {
   await fastify.register(websocket);
 
   fastify.decorate('authenticate', async function (request, reply) {
-    await request.jwtVerify();
+    try {
+      await request.jwtVerify();
+    } catch {
+      const err = new Error('Unauthorized');
+      err.statusCode = 401;
+      throw err;
+    }
   });
 
   fastify.register(async function wsPlugin(f) {

@@ -5,7 +5,7 @@ import initSqlJs from 'sql.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const DB_PATH = process.env.DB_PATH || `${__dirname}/../../../data/opscore.db`;
+const DB_PATH = process.env.DB_PATH || `${__dirname}/../../data/opscore.db`;
 
 let db = null;
 let writeChain = Promise.resolve();
