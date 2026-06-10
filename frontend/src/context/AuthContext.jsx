@@ -53,11 +53,19 @@ export function AuthProvider({ children }) {
           const data = await res.json();
           setUser(data.user || data);
           setToken(storedToken);
-        } else {
+        } else if (res.status === 401) {
+          // Token is definitively invalid — clear it
           localStorage.removeItem('opscore_token');
           localStorage.removeItem('opscore_user');
           setToken(null);
           setUser(null);
+        } else {
+          // 5xx or other server error — keep stored session rather than logging out
+          const storedUser = localStorage.getItem('opscore_user');
+          if (storedUser) {
+            try { setUser(JSON.parse(storedUser)); } catch {}
+          }
+          setToken(storedToken);
         }
       } catch {
         // Network error — keep token but don't verify
