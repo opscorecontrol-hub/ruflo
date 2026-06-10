@@ -42,7 +42,7 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [newMonitor, setNewMonitor] = useState({ name: '', url: '', interval: 60 });
+  const [newMonitor, setNewMonitor] = useState({ name: '', url: '', interval_s: 60 });
   const [actionError, setActionError] = useState('');
 
   const loadMonitors = useCallback(async () => {
@@ -194,8 +194,8 @@ export default function Dashboard() {
               <label style={{ display: 'block', fontSize: '12px', color: '#a1a1aa', marginBottom: '4px' }}>Interval (s)</label>
               <input
                 type="number"
-                value={newMonitor.interval}
-                onChange={(e) => setNewMonitor((p) => ({ ...p, interval: Number(e.target.value) }))}
+                value={newMonitor.interval_s}
+                onChange={(e) => setNewMonitor((p) => ({ ...p, interval_s: Number(e.target.value) }))}
                 min={10}
                 style={{ ...inputStyle, width: '100px' }}
               />

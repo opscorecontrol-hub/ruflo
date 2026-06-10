@@ -100,7 +100,7 @@ export default function MonitorDetail() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {[
           { label: 'URL', value: monitor.url },
-          { label: 'Interval', value: monitor.interval ? `${monitor.interval}s` : '—' },
+          { label: 'Interval', value: (monitor.interval_s || monitor.interval) ? `${monitor.interval_s || monitor.interval}s` : '—' },
           { label: 'Uptime', value: monitor.uptime != null ? `${Number(monitor.uptime).toFixed(2)}%` : '—' },
           { label: 'Response Time', value: monitor.responseTime != null ? `${monitor.responseTime}ms` : (monitor.response_time != null ? `${monitor.response_time}ms` : '—') },
           { label: 'Created', value: formatDate(monitor.createdAt || monitor.created_at) },
