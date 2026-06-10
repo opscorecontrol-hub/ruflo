@@ -37,7 +37,7 @@ export async function runCheck(monitorId) {
       [checkId, monitorId, result.status, result.responseTime, result.statusCode, result.error, now]
     );
     runQuery(
-      'UPDATE monitors SET status = ? WHERE id = ?',
+      "UPDATE monitors SET status = ? WHERE id = ? AND status != 'paused'",
       [result.status === 'up' ? 'active' : 'down', monitorId]
     );
   });

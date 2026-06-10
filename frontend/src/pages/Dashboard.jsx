@@ -294,7 +294,7 @@ export default function Dashboard() {
                     >
                       {m.name}
                     </Link>
-                    {m.paused && (
+                    {m.status === 'paused' && (
                       <span style={{ marginLeft: '8px', fontSize: '11px', color: '#eab308', backgroundColor: 'rgba(234,179,8,0.1)', padding: '2px 6px', borderRadius: '4px' }}>
                         PAUSED
                       </span>
@@ -312,7 +312,7 @@ export default function Dashboard() {
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <ActionBtn onClick={() => handleAction(m.id || m._id, 'check')}>Check</ActionBtn>
-                      {m.paused
+                      {m.status === 'paused'
                         ? <ActionBtn onClick={() => handleAction(m.id || m._id, 'resume')}>Resume</ActionBtn>
                         : <ActionBtn onClick={() => handleAction(m.id || m._id, 'pause')}>Pause</ActionBtn>
                       }
