@@ -10,10 +10,10 @@ export default async function vmRoutes(fastify) {
   });
 
   fastify.post('/api/vms', auth, async (request, reply) => {
-    const { swarm_id, provider, instanceType, region } = request.body || {};
+    const { swarm_id, provider, instanceType, instance_type, region } = request.body || {};
     if (!swarm_id) return reply.code(400).send({ error: 'swarm_id required' });
     try {
-      const vm = await vmProvisioner.createVm(swarm_id, { provider, instanceType, region });
+      const vm = await vmProvisioner.createVm(swarm_id, { provider, instanceType: instanceType || instance_type, region });
       return reply.code(201).send(vm);
     } catch (err) {
       return reply.code(500).send({ error: err.message });
