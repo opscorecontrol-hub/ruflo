@@ -60,7 +60,7 @@ services:
   ruflo-chat-ui:
     build:
       context: ./ruflo/src/ruvocal
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.opscore
       args:
         INCLUDE_DB: "false"
     restart: unless-stopped
