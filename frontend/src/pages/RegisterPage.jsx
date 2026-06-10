@@ -1,16 +1,17 @@
 import { useState } from 'react';
-import { flushSync } from 'react-dom';
-import { useNavigate, Link } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function RegisterPage() {
   const { login } = useAuth();
-  const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  if (done) return <Navigate to="/dashboard" replace />;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,10 +28,8 @@ export default function RegisterPage() {
         setError(data.message || data.error || 'Registration failed');
         return;
       }
-      flushSync(() => {
-        login(data.token, data.user);
-      });
-      navigate('/dashboard', { replace: true });
+      login(data.token, data.user);
+      setDone(true);
     } catch {
       setError('Network error — please try again');
     } finally {
