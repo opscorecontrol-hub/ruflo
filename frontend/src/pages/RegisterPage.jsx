@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function RegisterPage() {
   const { login } = useAuth();
-  const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,8 +25,8 @@ export default function RegisterPage() {
         setError(data.message || data.error || 'Registration failed');
         return;
       }
+      // App.jsx route guard redirects to /dashboard once user state is set
       login(data.token, data.user);
-      navigate('/dashboard');
     } catch {
       setError('Network error — please try again');
     } finally {
