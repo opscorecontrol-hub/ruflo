@@ -6,10 +6,15 @@ export function evaluateScaling({ agentCount, vmCount, avgLoad, queueDepth, poli
 
   const maxAgents = policy?.maxAgents || 20;
   const minAgents = policy?.minAgents || 1;
+  const maxVms = policy?.maxVms || 5;
 
   if (avgLoad > HIGH_LOAD && agentCount < maxAgents) {
     const delta = Math.min(2, maxAgents - agentCount);
-    return { action: 'scale_up', reason: `avgLoad ${avgLoad}% exceeds HIGH_LOAD ${HIGH_LOAD}%`, delta };
+    // Only provision a new VM if under the cap; otherwise reuse existing
+    if (vmCount < maxVms) {
+      return { action: 'scale_up', reason: `avgLoad ${avgLoad}% exceeds HIGH_LOAD ${HIGH_LOAD}%`, delta };
+    }
+    return { action: 'spawn_agents', reason: `VM cap reached (${vmCount}/${maxVms}), spawning on existing`, delta };
   }
 
   if (queueDepth > QUEUE_DEPTH && agentCount < maxAgents) {

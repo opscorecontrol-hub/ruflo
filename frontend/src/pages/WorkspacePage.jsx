@@ -255,6 +255,204 @@ function logTag(level) {
   return 'INF';
 }
 
+// Maps incoming WS events to AI terminal lines the way Devin AI shows activity
+function eventToTerminalLines(eventType, data) {
+  const ts = new Date().toLocaleTimeString('en', { hour12: false });
+  const id = (data?.id || data?.agentId || '').slice(0, 8);
+  const vmIp = data?.ip_address || data?.ip || '10.0.x.x';
+
+  switch (eventType) {
+    case 'agent:status':
+      if (data?.status === 'idle') {
+        return [
+          { t: ts, kind: 'cmd',    text: `$ ps aux | grep agent-${id}` },
+          { t: ts, kind: 'stdout', text: `blackbird   1234  0.1  0.2  agent-${id} [${data?.type || 'worker'}] — idle` },
+        ];
+      }
+      if (data?.status === 'busy') {
+        return [
+          { t: ts, kind: 'cmd',    text: `$ systemctl status blackbird-agent@${id}` },
+          { t: ts, kind: 'stdout', text: `● blackbird-agent@${id} — Active: running (1m 23s)` },
+          { t: ts, kind: 'stdout', text: `  task: processing queued payload...` },
+        ];
+      }
+      if (data?.status === 'terminated') {
+        return [
+          { t: ts, kind: 'cmd',    text: `$ systemctl stop blackbird-agent@${id}` },
+          { t: ts, kind: 'ok',     text: `[  OK  ] Stopped blackbird-agent@${id}` },
+        ];
+      }
+      return [{ t: ts, kind: 'info', text: `agent ${id} → ${data?.status}` }];
+
+    case 'swarm:scaled':
+      if (data?.action === 'scale_up') {
+        return [
+          { t: ts, kind: 'cmd',    text: `$ docker run -d --name worker-${id} blackbird/agent:latest` },
+          { t: ts, kind: 'stdout', text: `${data?.delta || 1}x container(s) starting...` },
+          { t: ts, kind: 'ok',     text: `[  OK  ] Agents spawned — ${data?.reason || ''}` },
+        ];
+      }
+      if (data?.action === 'scale_down') {
+        return [
+          { t: ts, kind: 'cmd',    text: `$ docker stop $(docker ps -q --filter label=blackbird.swarm=${data?.swarmId?.slice(0,8) || '?'})` },
+          { t: ts, kind: 'ok',     text: `[  OK  ] Scaled down — ${data?.reason || ''}` },
+        ];
+      }
+      if (data?.action === 'cleanup') {
+        return [
+          { t: ts, kind: 'cmd',    text: `$ blackbird-cli vms cleanup --orphaned` },
+          { t: ts, kind: 'ok',     text: `[  OK  ] ${data?.reason || 'Orphaned VMs destroyed'}` },
+        ];
+      }
+      return [{ t: ts, kind: 'info', text: `swarm scaled: ${data?.action} — ${data?.reason || ''}` }];
+
+    case 'vm:status':
+      if (data?.status === 'running') {
+        return [
+          { t: ts, kind: 'cmd',    text: `$ ssh root@${vmIp} 'uname -a && df -h /'` },
+          { t: ts, kind: 'stdout', text: `Linux blackbird-node 6.1.0 #1 SMP x86_64 GNU/Linux` },
+          { t: ts, kind: 'stdout', text: `Filesystem      Size  Used Avail Use%` },
+          { t: ts, kind: 'stdout', text: `/dev/sda1        80G  3.2G   77G   4%  /` },
+          { t: ts, kind: 'ok',     text: `[  OK  ] VM ${id} online at ${vmIp}` },
+        ];
+      }
+      if (data?.status === 'provisioning') {
+        return [
+          { t: ts, kind: 'cmd',    text: `$ hcloud server create --name bb-${id} --type cx22 --image debian-12` },
+          { t: ts, kind: 'stdout', text: `Waiting for server to start...` },
+        ];
+      }
+      return [{ t: ts, kind: 'info', text: `VM ${id} → ${data?.status}` }];
+
+    case 'monitor:check':
+      return [
+        { t: ts, kind: 'cmd',    text: `$ curl -sI --max-time 5 "${data?.url || 'http://...'}" | head -1` },
+        { t: ts, kind: data?.ok ? 'ok' : 'err', text: data?.ok ? `HTTP/1.1 200 OK  — ${data?.name || 'monitor'} ✓` : `curl: (7) Failed — ${data?.name || 'monitor'} DOWN` },
+      ];
+
+    default:
+      return [];
+  }
+}
+
+function AiDesktop({ termLines, activeAgents, vms }) {
+  const termRef = useRef(null);
+  const [activeVm, setActiveVm] = useState(0);
+
+  useEffect(() => {
+    termRef.current?.scrollTo({ top: termRef.current.scrollHeight, behavior: 'smooth' });
+  }, [termLines]);
+
+  const busyAgents = activeAgents.filter(a => a.status === 'busy');
+  const runningVms = vms.filter(v => v.status === 'running');
+  const currentVm = runningVms[activeVm % Math.max(runningVms.length, 1)];
+
+  function lineColor(kind) {
+    if (kind === 'cmd')    return '#c586c0';
+    if (kind === 'ok')     return '#4ec9b0';
+    if (kind === 'err')    return '#f44747';
+    if (kind === 'stdout') return '#9cdcfe';
+    return '#858585';
+  }
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Active agent banner */}
+      <div style={{
+        padding: '6px 10px',
+        backgroundColor: '#0f1a0f',
+        borderBottom: '1px solid #1a3a1a',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        flexShrink: 0,
+      }}>
+        <span style={{
+          width: '7px', height: '7px', borderRadius: '50%',
+          backgroundColor: busyAgents.length > 0 ? '#22c55e' : '#555',
+          boxShadow: busyAgents.length > 0 ? '0 0 6px #22c55e' : 'none',
+          flexShrink: 0,
+        }} />
+        <span style={{ fontSize: '10px', color: '#4ec9b0', fontWeight: 600, letterSpacing: '0.06em' }}>
+          {busyAgents.length > 0
+            ? `AI ACTIVE — ${busyAgents.length} agent${busyAgents.length > 1 ? 's' : ''} working`
+            : activeAgents.length > 0
+            ? `STANDBY — ${activeAgents.length} agent${activeAgents.length > 1 ? 's' : ''} idle`
+            : 'WAITING FOR AGENTS'}
+        </span>
+        {runningVms.length > 0 && (
+          <span style={{ marginLeft: 'auto', fontSize: '10px', color: '#555' }}>
+            <span
+              style={{ color: '#6366f1', cursor: runningVms.length > 1 ? 'pointer' : 'default' }}
+              onClick={() => setActiveVm(v => (v + 1) % runningVms.length)}
+            >
+              {currentVm?.ip_address || currentVm?.id?.slice(0, 10) || '—'}
+            </span>
+            {runningVms.length > 1 && <span style={{ color: '#333' }}> +{runningVms.length - 1}</span>}
+          </span>
+        )}
+      </div>
+
+      {/* VM info strip */}
+      {currentVm && (
+        <div style={{
+          padding: '4px 10px',
+          backgroundColor: '#0a0a0a',
+          borderBottom: '1px solid #1a1a1a',
+          display: 'flex',
+          gap: '14px',
+          flexShrink: 0,
+          flexWrap: 'wrap',
+        }}>
+          {[
+            ['HOST', currentVm.ip_address || '—'],
+            ['PROVIDER', currentVm.provider || '—'],
+            ['TYPE', currentVm.instance_type || '—'],
+            ['STATUS', currentVm.status],
+          ].map(([k, v]) => (
+            <span key={k} style={{ fontSize: '9px', color: '#3a3a3a' }}>
+              <span style={{ letterSpacing: '0.06em', marginRight: '3px' }}>{k}</span>
+              <span style={{ color: '#777', fontFamily: 'Consolas, monospace' }}>{v}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Terminal */}
+      <div
+        ref={termRef}
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '8px 10px',
+          fontFamily: '"Cascadia Code", Consolas, "Courier New", monospace',
+          fontSize: '11px',
+          lineHeight: '17px',
+          backgroundColor: '#0d0d0d',
+        }}
+      >
+        {termLines.length === 0 && (
+          <div style={{ padding: '20px 0', color: '#333', fontSize: '11px', textAlign: 'center' }}>
+            <div style={{ marginBottom: '6px', fontSize: '18px' }}>⬡</div>
+            <div style={{ color: '#555' }}>Waiting for AI activity…</div>
+            <div style={{ color: '#333', marginTop: '4px' }}>Events appear here in real time</div>
+          </div>
+        )}
+        {termLines.map((line, i) => (
+          <div key={i} style={{ display: 'flex', gap: '6px', marginBottom: '1px' }}>
+            <span style={{ color: '#2a2a2a', flexShrink: 0, userSelect: 'none', fontFamily: 'Consolas, monospace' }}>
+              {line.t}
+            </span>
+            <span style={{ color: lineColor(line.kind), wordBreak: 'break-all' }}>
+              {line.text}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function vmStatusColor(status) {
   if (status === 'running') return '#22c55e';
   if (status === 'provisioning' || status === 'pending') return '#eab308';
@@ -380,7 +578,8 @@ export default function WorkspacePage() {
 
   const [mapData, setMapData] = useState({ swarms: [], agents: [] });
   const [vms, setVms] = useState([]);
-  const [rightTab, setRightTab] = useState('output');
+  const [rightTab, setRightTab] = useState('ai-desktop');
+  const [termLines, setTermLines] = useState([]);
 
   const [activeTab, setActiveTab] = useState('workspace.js');
   const [tabContents, setTabContents] = useState(TABS_CONTENT);
@@ -416,29 +615,38 @@ export default function WorkspacePage() {
     return () => clearInterval(t);
   }, [fetchWithAuth, loadMap]);
 
+  const addTermLines = useCallback((lines) => {
+    if (!lines.length) return;
+    setTermLines(prev => [...prev.slice(-499), ...lines]);
+  }, []);
+
   useEffect(() => {
     const unsubs = [
       subscribe('log:entry', (d) => addLog(d?.level || 'info', d?.message || '')),
       subscribe('agent:status', (d) => {
         addLog('info', `Agent ${(d?.id || '?').slice(0, 8)} → ${d?.status}`);
+        addTermLines(eventToTerminalLines('agent:status', d));
         loadMap();
       }),
       subscribe('swarm:scaled', (d) => {
         addLog('info', `Swarm scaled: ${d?.action || ''} (${d?.reason || ''})`);
+        addTermLines(eventToTerminalLines('swarm:scaled', d));
         loadMap();
       }),
       subscribe('vm:status', (d) => {
         addLog('info', `VM ${(d?.id || '?').slice(0, 8)} → ${d?.status}`);
+        addTermLines(eventToTerminalLines('vm:status', d));
         loadMap();
       }),
       subscribe('monitor:check', (d) => {
         const lvl = d?.ok ? 'success' : 'warn';
         addLog(lvl, `Monitor "${d?.name || '?'}" ${d?.ok ? 'up' : 'down'}`);
+        addTermLines(eventToTerminalLines('monitor:check', d));
       }),
       subscribe('connected', () => addLog('success', 'WebSocket connected')),
     ];
     return () => unsubs.forEach(u => u());
-  }, [subscribe, addLog, loadMap]);
+  }, [subscribe, addLog, addTermLines, loadMap]);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   useEffect(() => { logsEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [logs]);
@@ -735,7 +943,7 @@ export default function WorkspacePage() {
           </div>
         </div>
 
-        {/* RIGHT — Output / VM Console */}
+        {/* RIGHT — AI Desktop / VM Console / Logs */}
         <div style={{
           width: '310px',
           flexShrink: 0,
@@ -753,35 +961,49 @@ export default function WorkspacePage() {
             alignItems: 'center',
             flexShrink: 0,
           }}>
-            {['output', 'vm console'].map(tab => (
+            {[
+              { id: 'ai-desktop', label: 'AI Desktop' },
+              { id: 'vm-console', label: 'VMs', badge: vms.length || null },
+              { id: 'logs', label: 'Logs' },
+            ].map(({ id, label, badge }) => (
               <button
-                key={tab}
-                onClick={() => setRightTab(tab)}
+                key={id}
+                onClick={() => setRightTab(id)}
                 style={{
-                  padding: '6px 12px',
+                  padding: '6px 10px',
                   fontSize: '10px',
                   fontWeight: 600,
                   letterSpacing: '0.07em',
                   textTransform: 'uppercase',
                   border: 'none',
-                  borderBottom: rightTab === tab ? `2px solid ${C.accent}` : '2px solid transparent',
+                  borderBottom: rightTab === id ? `2px solid ${C.accent}` : '2px solid transparent',
                   backgroundColor: 'transparent',
-                  color: rightTab === tab ? C.text : C.textDim,
+                  color: rightTab === id ? C.text : C.textDim,
                   cursor: 'pointer',
                 }}
               >
-                {tab}
-                {tab === 'vm console' && vms.length > 0 && (
+                {label}
+                {badge > 0 && (
                   <span style={{
                     marginLeft: '4px', fontSize: '9px', backgroundColor: '#6366f122',
                     color: '#6366f1', padding: '0 4px', borderRadius: '8px',
                   }}>
-                    {vms.length}
+                    {badge}
                   </span>
                 )}
               </button>
             ))}
-            {rightTab === 'output' && (
+            {rightTab === 'ai-desktop' && termLines.length > 0 && (
+              <div style={{ marginLeft: 'auto', paddingRight: '8px' }}>
+                <button onClick={() => setTermLines([])} style={{
+                  background: 'none', border: 'none',
+                  color: C.textDim, fontSize: '10px', cursor: 'pointer', padding: 0,
+                }}>
+                  Clear
+                </button>
+              </div>
+            )}
+            {rightTab === 'logs' && (
               <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px', alignItems: 'center', paddingRight: '10px' }}>
                 <span style={{ fontSize: '10px', color: C.textDim }}>{logs.length}</span>
                 <button onClick={() => setLogs([])} style={{
@@ -794,8 +1016,13 @@ export default function WorkspacePage() {
             )}
           </div>
 
+          {/* AI Desktop */}
+          {rightTab === 'ai-desktop' && (
+            <AiDesktop termLines={termLines} activeAgents={mapData.agents} vms={vms} />
+          )}
+
           {/* Log stream */}
-          {rightTab === 'output' && (
+          {rightTab === 'logs' && (
           <div style={{
             flex: 1,
             overflowY: 'auto',
@@ -829,7 +1056,7 @@ export default function WorkspacePage() {
           )}
 
           {/* VM Console */}
-          {rightTab === 'vm console' && (
+          {rightTab === 'vm-console' && (
           <div style={{
             flex: 1,
             overflowY: 'auto',

@@ -73,4 +73,30 @@ export default async function orchestrationRoutes(fastify) {
       getAll('SELECT * FROM tasks WHERE id = ?', [id])[0] || { id, swarm_id, title, status: 'queued' }
     );
   });
+
+  // Cancel or retry a single task
+  fastify.put('/api/orchestration/tasks/:id', auth, async (request, reply) => {
+    const { status } = request.body || {};
+    const allowed = ['cancelled', 'queued'];
+    if (!allowed.includes(status)) {
+      return reply.code(400).send({ error: `status must be one of: ${allowed.join(', ')}` });
+    }
+    const task = getAll('SELECT * FROM tasks WHERE id = ?', [request.params.id])[0];
+    if (!task) return reply.code(404).send({ error: 'Task not found' });
+
+    await writeQueue(() => {
+      runQuery('UPDATE tasks SET status = ? WHERE id = ?', [status, request.params.id]);
+    });
+    return getAll('SELECT * FROM tasks WHERE id = ?', [request.params.id])[0];
+  });
+
+  // Bulk clear tasks by status (e.g. DELETE /api/orchestration/tasks?status=completed,failed)
+  fastify.delete('/api/orchestration/tasks', auth, async (request, reply) => {
+    const statuses = (request.query.status || 'completed,failed').split(',').map(s => s.trim());
+    const placeholders = statuses.map(() => '?').join(',');
+    await writeQueue(() => {
+      runQuery(`DELETE FROM tasks WHERE status IN (${placeholders})`, statuses);
+    });
+    return { ok: true, cleared: statuses };
+  });
 }

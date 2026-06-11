@@ -78,6 +78,8 @@ export default function VMsPage() {
   const [creating, setCreating] = useState(false);
   const [newVm, setNewVm] = useState({ swarm_id: '', provider: 'local', instance_type: 'cx11' });
   const [actionError, setActionError] = useState('');
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -147,26 +149,83 @@ export default function VMsPage() {
     }
   };
 
+  const handleCleanup = async () => {
+    setCleaning(true);
+    setCleanupResult(null);
+    setActionError('');
+    try {
+      const res = await fetchWithAuth('/vms/cleanup', { method: 'POST' });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setActionError(d.error || 'Cleanup failed');
+        return;
+      }
+      const d = await res.json();
+      setCleanupResult(d);
+      await load();
+    } catch {
+      setActionError('Network error');
+    } finally {
+      setCleaning(false);
+    }
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#e4e4e7' }}>Virtual Machines</h1>
-        <button
-          onClick={() => setShowCreate(!showCreate)}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: showCreate ? '#27272a' : '#6366f1',
-            border: 'none',
-            borderRadius: '6px',
-            color: '#fff',
-            fontSize: '13px',
-            fontWeight: 500,
-            cursor: 'pointer',
-          }}
-        >
-          {showCreate ? 'Cancel' : '+ Provision VM'}
-        </button>
+        <div>
+          <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#e4e4e7', margin: 0 }}>Virtual Machines</h1>
+          {vms.length > 0 && (
+            <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#71717a' }}>
+              {vms.filter(v => v.status === 'running').length} running ·{' '}
+              {vms.filter(v => v.status !== 'terminated').length} total
+            </p>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {vms.length > 0 && (
+            <button
+              onClick={handleCleanup}
+              disabled={cleaning}
+              style={{
+                padding: '8px 14px',
+                backgroundColor: 'transparent',
+                border: '1px solid #ef444466',
+                borderRadius: '6px',
+                color: '#ef4444',
+                fontSize: '13px',
+                fontWeight: 500,
+                cursor: cleaning ? 'not-allowed' : 'pointer',
+                opacity: cleaning ? 0.6 : 1,
+              }}
+            >
+              {cleaning ? 'Cleaning…' : '🧹 Cleanup Orphaned'}
+            </button>
+          )}
+          <button
+            onClick={() => setShowCreate(!showCreate)}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: showCreate ? '#27272a' : '#6366f1',
+              border: 'none',
+              borderRadius: '6px',
+              color: '#fff',
+              fontSize: '13px',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            {showCreate ? 'Cancel' : '+ Provision VM'}
+          </button>
+        </div>
       </div>
+
+      {cleanupResult && (
+        <div style={{ padding: '10px 14px', backgroundColor: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '6px', color: '#22c55e', fontSize: '13px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Cleanup complete — {cleanupResult.destroyed} orphaned VMs destroyed.</span>
+          <button onClick={() => setCleanupResult(null)} style={{ background: 'none', border: 'none', color: '#22c55e', cursor: 'pointer', fontSize: '14px' }}>×</button>
+        </div>
+      )}
 
       {showCreate && (
         <div

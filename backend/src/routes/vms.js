@@ -1,5 +1,6 @@
 import * as vmProvisioner from '../services/vmProvisioner.js';
-import { getOne } from '../db/init.js';
+import { cleanupOrphanedVms } from '../services/swarmController.js';
+import { getOne, getAll } from '../db/init.js';
 
 export default async function vmRoutes(fastify) {
   const auth = { onRequest: [fastify.authenticate] };
@@ -42,5 +43,29 @@ export default async function vmRoutes(fastify) {
     if (!vm) return reply.code(404).send({ error: 'VM not found' });
     const updated = await vmProvisioner.syncVmStatus(request.params.id);
     return updated;
+  });
+
+  // Returns count of active VMs per status, with agent assignment stats
+  fastify.get('/api/vms/health', auth, async () => {
+    const vms = getAll('SELECT * FROM vms WHERE status != ?', ['terminated']);
+    const result = vms.map(vm => {
+      const agents = getAll(
+        "SELECT id, status FROM agents WHERE vm_id = ? AND status != 'terminated'",
+        [vm.id]
+      );
+      return { ...vm, agentCount: agents.length, agents };
+    });
+    const orphaned = result.filter(v => v.agentCount === 0);
+    return { total: result.length, orphaned: orphaned.length, vms: result };
+  });
+
+  // Destroy all VMs that have zero live agents assigned (safe to call any time)
+  fastify.post('/api/vms/cleanup', auth, async (request, reply) => {
+    try {
+      const report = await cleanupOrphanedVms();
+      return { ok: true, destroyed: report.destroyed.length, ids: report.destroyed };
+    } catch (err) {
+      return reply.code(500).send({ error: err.message });
+    }
   });
 }

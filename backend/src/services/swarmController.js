@@ -93,27 +93,32 @@ export async function evaluateAndScale(swarmId) {
     const vms = listVms(swarmId).filter(v => v.status !== 'terminated');
     const tasks = getAll("SELECT * FROM tasks WHERE swarm_id = ? AND status = 'queued'", [swarmId]);
 
-    // Don't scale beyond target_agent_count
+    // Never exceed target_agent_count and never scale when already at cap
     if (agents.length >= swarm.target_agent_count) return;
 
     const policy = (() => { try { return JSON.parse(swarm.policy); } catch { return {}; } })();
-    // Use policy.simulatedLoad if set; otherwise derive from queue depth only — no random noise
     const avgLoad = policy.simulatedLoad ?? (tasks.length > 0 ? 90 : 10);
+    const maxVms = policy.maxVms || 5;
 
     const decision = evaluateScaling({
       agentCount: agents.length,
       vmCount: vms.length,
       avgLoad,
       queueDepth: tasks.length,
-      policy: { ...policy, maxAgents: swarm.target_agent_count }
+      policy: { ...policy, maxAgents: swarm.target_agent_count, maxVms }
     });
 
     if (decision.action === 'none') return;
 
     if (decision.action === 'scale_up') {
-      const vm = await createVm(swarmId, { instanceType: 'cx22' });
-      for (let i = 0; i < decision.delta; i++) {
-        await spawnAgent({ swarmId, type: 'worker', vmId: vm.id });
+      // Double-check VM cap — scalingPolicy may have already redirected, but guard here too
+      if (vms.length >= maxVms) {
+        await spawnAgent({ swarmId, type: 'worker' });
+      } else {
+        const vm = await createVm(swarmId, { instanceType: 'cx22' });
+        for (let i = 0; i < decision.delta; i++) {
+          await spawnAgent({ swarmId, type: 'worker', vmId: vm.id });
+        }
       }
     } else if (decision.action === 'spawn_agents') {
       for (let i = 0; i < decision.delta; i++) {
@@ -123,7 +128,11 @@ export async function evaluateAndScale(swarmId) {
       const toTerminate = agents.slice(-decision.delta);
       for (const agent of toTerminate) {
         await terminateAgent(agent.id);
-        if (agent.vm_id) await destroyVm(agent.vm_id);
+        // Only destroy VM if no other agents remain on it
+        if (agent.vm_id) {
+          const remainingOnVm = agents.filter(a => a.vm_id === agent.vm_id && a.id !== agent.id);
+          if (remainingOnVm.length === 0) await destroyVm(agent.vm_id);
+        }
       }
     }
 
@@ -141,6 +150,31 @@ export async function evaluateAndScale(swarmId) {
   } finally {
     scalingLocks.delete(swarmId);
   }
+}
+
+export async function cleanupOrphanedVms() {
+  const allVms = listVms(null).filter(v => v.status !== 'terminated');
+  const destroyed = [];
+
+  for (const vm of allVms) {
+    const vmAgents = vm.swarm_id
+      ? getAgentsBySwarm(vm.swarm_id).filter(a => a.vm_id === vm.id && a.status !== 'terminated')
+      : [];
+    if (vmAgents.length === 0) {
+      try {
+        await destroyVm(vm.id);
+        destroyed.push(vm.id);
+      } catch (err) {
+        console.warn('[swarmController] cleanup failed for VM', vm.id, err.message);
+      }
+    }
+  }
+
+  if (destroyed.length > 0) {
+    bus.emit('swarm:scaled', { action: 'cleanup', reason: `Destroyed ${destroyed.length} orphaned VMs`, delta: destroyed.length });
+  }
+
+  return { destroyed };
 }
 
 export function startScalingLoop(intervalMs = 30000) {
