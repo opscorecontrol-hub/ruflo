@@ -105,7 +105,10 @@ export default function SwarmPage() {
         method = 'DELETE';
         endpoint = `/swarm/${id}`;
       }
-      const res = await fetchWithAuth(endpoint, { method });
+      const res = await fetchWithAuth(endpoint, {
+        method,
+        body: method === 'POST' ? '{}' : undefined,
+      });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         setActionError(d.message || `Action failed`);
