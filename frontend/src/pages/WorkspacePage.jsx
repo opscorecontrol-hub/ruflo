@@ -255,6 +255,115 @@ function logTag(level) {
   return 'INF';
 }
 
+function vmStatusColor(status) {
+  if (status === 'running') return '#22c55e';
+  if (status === 'provisioning' || status === 'pending') return '#eab308';
+  if (status === 'terminated' || status === 'error') return '#ef4444';
+  return '#71717a';
+}
+
+function VmCard({ vm, agents }) {
+  const statusColor = vmStatusColor(vm.status);
+  const isRunning = vm.status === 'running';
+  return (
+    <div style={{
+      backgroundColor: '#111518',
+      border: `1px solid ${isRunning ? '#1a3a1a' : '#27272a'}`,
+      borderRadius: '6px',
+      padding: '10px 12px',
+      marginBottom: '8px',
+    }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <span style={{
+            width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+            backgroundColor: statusColor,
+            boxShadow: isRunning ? `0 0 6px ${statusColor}88` : 'none',
+          }} />
+          <span style={{ fontSize: '11px', fontWeight: 700, color: '#d4d4d4', fontFamily: 'Consolas, monospace' }}>
+            {vm.id.slice(0, 10)}
+          </span>
+        </div>
+        <span style={{
+          fontSize: '9px', fontWeight: 600, letterSpacing: '0.08em',
+          color: statusColor, textTransform: 'uppercase',
+        }}>
+          {vm.status}
+        </span>
+      </div>
+
+      {/* Detail grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 8px', marginBottom: '7px' }}>
+        {[
+          ['PROVIDER', vm.provider || '—'],
+          ['IP', vm.ip_address || '—'],
+          ['TYPE', vm.instance_type || '—'],
+          ['AGENTS', agents.length],
+        ].map(([label, val]) => (
+          <div key={label} style={{ display: 'flex', gap: '4px', alignItems: 'baseline' }}>
+            <span style={{ fontSize: '9px', color: '#3a3a3a', fontWeight: 600, letterSpacing: '0.06em', minWidth: '46px' }}>
+              {label}
+            </span>
+            <span style={{ fontSize: '10px', color: '#9a9a9a', fontFamily: 'Consolas, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {String(val)}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Agents on VM */}
+      {agents.length > 0 && (
+        <div style={{ marginBottom: '6px' }}>
+          <div style={{ fontSize: '9px', color: '#3a3a3a', fontWeight: 600, letterSpacing: '0.06em', marginBottom: '3px' }}>
+            AGENT PROCESSES
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+            {agents.slice(0, 8).map(a => (
+              <span key={a.id} style={{
+                fontSize: '9px', padding: '1px 5px', borderRadius: '3px',
+                fontFamily: 'Consolas, monospace',
+                backgroundColor: a.status === 'busy' ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.1)',
+                color: a.status === 'busy' ? '#f59e0b' : '#22c55e',
+                border: `1px solid ${a.status === 'busy' ? 'rgba(245,158,11,0.2)' : 'rgba(34,197,94,0.2)'}`,
+              }}>
+                {a.type} {a.id.slice(0, 5)}
+              </span>
+            ))}
+            {agents.length > 8 && (
+              <span style={{ fontSize: '9px', color: '#555' }}>+{agents.length - 8} more</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* AI managed footer */}
+      <div style={{
+        borderTop: '1px solid #1e1e1e',
+        paddingTop: '5px',
+        marginTop: '2px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '5px',
+      }}>
+        <span style={{ fontSize: '9px', color: '#6366f1', fontWeight: 600, letterSpacing: '0.04em' }}>AI</span>
+        <span style={{ fontSize: '9px', color: '#333' }}>
+          {vm.provider === 'hetzner' ? 'Hetzner Cloud · AI-provisioned' : 'Local provider · AI-managed'}
+        </span>
+        {isRunning && (
+          <span style={{
+            marginLeft: 'auto', fontSize: '9px', color: '#22c55e',
+            display: 'flex', alignItems: 'center', gap: '3px',
+          }}>
+            <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#22c55e', boxShadow: '0 0 4px #22c55e' }} />
+            live
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function WorkspacePage() {
   const { fetchWithAuth } = useAuth();
   const { subscribe, connected } = useSocket();
@@ -270,6 +379,8 @@ export default function WorkspacePage() {
   const chatEndRef = useRef(null);
 
   const [mapData, setMapData] = useState({ swarms: [], agents: [] });
+  const [vms, setVms] = useState([]);
+  const [rightTab, setRightTab] = useState('output');
 
   const [activeTab, setActiveTab] = useState('workspace.js');
   const [tabContents, setTabContents] = useState(TABS_CONTENT);
@@ -287,6 +398,10 @@ export default function WorkspacePage() {
     fetchWithAuth('/workspace/swarm-map')
       .then(r => r.ok ? r.json() : null)
       .then(d => d && setMapData(d))
+      .catch(() => {});
+    fetchWithAuth('/vms')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d && setVms(Array.isArray(d) ? d : (d?.vms || [])))
       .catch(() => {});
   }, [fetchWithAuth]);
 
@@ -312,7 +427,10 @@ export default function WorkspacePage() {
         addLog('info', `Swarm scaled: ${d?.action || ''} (${d?.reason || ''})`);
         loadMap();
       }),
-      subscribe('vm:status', (d) => addLog('info', `VM ${(d?.id || '?').slice(0, 8)} → ${d?.status}`)),
+      subscribe('vm:status', (d) => {
+        addLog('info', `VM ${(d?.id || '?').slice(0, 8)} → ${d?.status}`);
+        loadMap();
+      }),
       subscribe('monitor:check', (d) => {
         const lvl = d?.ok ? 'success' : 'warn';
         addLog(lvl, `Monitor "${d?.name || '?'}" ${d?.ok ? 'up' : 'down'}`);
@@ -617,7 +735,7 @@ export default function WorkspacePage() {
           </div>
         </div>
 
-        {/* RIGHT — Output Terminal */}
+        {/* RIGHT — Output / VM Console */}
         <div style={{
           width: '310px',
           flexShrink: 0,
@@ -627,33 +745,57 @@ export default function WorkspacePage() {
           flexDirection: 'column',
           overflow: 'hidden',
         }}>
+          {/* Tab bar */}
           <div style={{
-            padding: '6px 12px',
             borderBottom: `1px solid ${C.border}`,
-            fontSize: '10px',
-            fontWeight: 600,
-            color: C.textMuted,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
             backgroundColor: '#1a1a1a',
+            display: 'flex',
+            alignItems: 'center',
             flexShrink: 0,
           }}>
-            <span>Output</span>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <span style={{ color: C.textDim, fontWeight: 400 }}>{logs.length}</span>
-              <button onClick={() => setLogs([])} style={{
-                background: 'none', border: 'none',
-                color: C.textDim, fontSize: '11px', cursor: 'pointer', padding: 0,
-              }}>
-                Clear
+            {['output', 'vm console'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setRightTab(tab)}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  letterSpacing: '0.07em',
+                  textTransform: 'uppercase',
+                  border: 'none',
+                  borderBottom: rightTab === tab ? `2px solid ${C.accent}` : '2px solid transparent',
+                  backgroundColor: 'transparent',
+                  color: rightTab === tab ? C.text : C.textDim,
+                  cursor: 'pointer',
+                }}
+              >
+                {tab}
+                {tab === 'vm console' && vms.length > 0 && (
+                  <span style={{
+                    marginLeft: '4px', fontSize: '9px', backgroundColor: '#6366f122',
+                    color: '#6366f1', padding: '0 4px', borderRadius: '8px',
+                  }}>
+                    {vms.length}
+                  </span>
+                )}
               </button>
-            </div>
+            ))}
+            {rightTab === 'output' && (
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px', alignItems: 'center', paddingRight: '10px' }}>
+                <span style={{ fontSize: '10px', color: C.textDim }}>{logs.length}</span>
+                <button onClick={() => setLogs([])} style={{
+                  background: 'none', border: 'none',
+                  color: C.textDim, fontSize: '11px', cursor: 'pointer', padding: 0,
+                }}>
+                  Clear
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Log stream */}
+          {rightTab === 'output' && (
           <div style={{
             flex: 1,
             overflowY: 'auto',
@@ -684,6 +826,38 @@ export default function WorkspacePage() {
             ))}
             <div ref={logsEndRef} />
           </div>
+          )}
+
+          {/* VM Console */}
+          {rightTab === 'vm console' && (
+          <div style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '8px',
+          }}>
+            {vms.length === 0 ? (
+              <div style={{
+                padding: '24px 12px',
+                textAlign: 'center',
+                color: C.textDim,
+                fontSize: '11px',
+                lineHeight: '1.7',
+              }}>
+                <div style={{ fontSize: '22px', marginBottom: '8px' }}>◻</div>
+                <div style={{ color: C.textMuted, marginBottom: '6px' }}>No VMs provisioned</div>
+                <div>Type in the chat:</div>
+                <code style={{ color: C.green, fontSize: '10px' }}>provision vm for &lt;swarm&gt;</code>
+                <div style={{ marginTop: '6px' }}>or use the <strong style={{ color: C.text }}>VMs</strong> page</div>
+              </div>
+            ) : vms.map(vm => (
+              <VmCard
+                key={vm.id}
+                vm={vm}
+                agents={mapData.agents.filter(a => a.vm_id === vm.id)}
+              />
+            ))}
+          </div>
+          )}
 
           {/* Stats */}
           <div style={{
@@ -692,7 +866,7 @@ export default function WorkspacePage() {
             backgroundColor: '#111',
             flexShrink: 0,
           }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '6px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '6px' }}>
               {[
                 {
                   label: 'Swarms',
@@ -705,6 +879,12 @@ export default function WorkspacePage() {
                   value: mapData.agents.length,
                   sub: `${mapData.agents.filter(a => a.status === 'idle').length} idle`,
                   color: '#22c55e',
+                },
+                {
+                  label: 'VMs',
+                  value: vms.length,
+                  sub: `${vms.filter(v => v.status === 'running').length} running`,
+                  color: '#f59e0b',
                 },
               ].map(({ label, value, sub, color }) => (
                 <div key={label} style={{
