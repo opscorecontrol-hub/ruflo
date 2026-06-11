@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+websockets
+httpx
+aiosqlite
+python-multipart
+anthropic
+openai
+google-generativeai
+mistralai
+groq
+duckduckgo-search
+beautifulsoup4
+python-dotenv
+nanoid
