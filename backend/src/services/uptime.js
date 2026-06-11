@@ -64,7 +64,14 @@ export async function runCheck(monitorId) {
     });
   }
 
-  bus.emit('monitor:check', { monitorId, ...result, checkedAt: now });
+  bus.emit('monitor:check', {
+    monitorId,
+    name: monitor.name,
+    url: monitor.url,
+    ok: result.status === 'up',
+    ...result,
+    checkedAt: now,
+  });
   return result;
 }
 

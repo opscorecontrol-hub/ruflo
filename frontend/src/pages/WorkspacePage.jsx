@@ -703,7 +703,7 @@ export default function WorkspacePage() {
                 {
                   label: 'Agents',
                   value: mapData.agents.length,
-                  sub: `${mapData.agents.filter(a => a.status === 'busy').length} busy`,
+                  sub: `${mapData.agents.filter(a => a.status === 'idle').length} idle`,
                   color: '#22c55e',
                 },
               ].map(({ label, value, sub, color }) => (
