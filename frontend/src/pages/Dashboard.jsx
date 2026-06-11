@@ -100,11 +100,11 @@ export default function Dashboard() {
       if (action === 'delete') {
         res = await fetchWithAuth(`/monitors/${id}`, { method: 'DELETE' });
       } else if (action === 'check') {
-        res = await fetchWithAuth(`/monitors/${id}/check`, { method: 'POST' });
+        res = await fetchWithAuth(`/monitors/${id}/check`, { method: 'POST', body: '{}' });
       } else if (action === 'pause') {
-        res = await fetchWithAuth(`/monitors/${id}/pause`, { method: 'POST' });
+        res = await fetchWithAuth(`/monitors/${id}/pause`, { method: 'POST', body: '{}' });
       } else if (action === 'resume') {
-        res = await fetchWithAuth(`/monitors/${id}/resume`, { method: 'POST' });
+        res = await fetchWithAuth(`/monitors/${id}/resume`, { method: 'POST', body: '{}' });
       }
       if (res && !res.ok) {
         const d = await res.json().catch(() => ({}));
