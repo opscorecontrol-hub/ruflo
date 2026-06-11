@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const navItems = [
   { label: 'Workspace', path: '/workspace' },
@@ -9,10 +10,18 @@ const navItems = [
   { label: 'VMs', path: '/vms' },
   { label: 'Orchestration', path: '/orchestration' },
   { label: 'Logs', path: '/logs' },
+  { label: '─', path: null, divider: true },
+  { label: 'Marketplace', path: '/marketplace' },
+  { label: 'My Services', path: '/saas' },
+  { label: 'Users (IAM)', path: '/saas/iam' },
+  { label: 'Roles (PAM)', path: '/saas/pam' },
+  { label: 'Operator', path: '/saas/operator', operatorOnly: true },
 ];
 
 export default function Sidebar() {
   const { connected } = useSocket();
+  const { user } = useAuth();
+  const isOperator = user?.saas_role === 'operator';
 
   return (
     <aside
@@ -58,27 +67,33 @@ export default function Sidebar() {
           overflowY: 'auto',
         }}
       >
-        {navItems.map(({ label, path }) => (
-          <NavLink
-            key={path}
-            to={path}
-            end={path === '/dashboard'}
-            style={({ isActive }) => ({
-              display: 'flex',
-              alignItems: 'center',
-              padding: '9px 16px',
-              color: isActive ? '#6366f1' : '#a1a1aa',
-              backgroundColor: isActive ? 'rgba(99,102,241,0.1)' : 'transparent',
-              borderLeft: isActive ? '2px solid #6366f1' : '2px solid transparent',
-              textDecoration: 'none',
-              fontSize: '14px',
-              fontWeight: isActive ? 500 : 400,
-              transition: 'color 0.15s, background-color 0.15s',
-            })}
-          >
-            {label}
-          </NavLink>
-        ))}
+        {navItems.map(({ label, path, divider, operatorOnly }) => {
+          if (operatorOnly && !isOperator) return null;
+          if (divider) return (
+            <div key={label} style={{ height: '1px', backgroundColor: '#27272a', margin: '6px 12px' }} />
+          );
+          return (
+            <NavLink
+              key={path}
+              to={path}
+              end={path === '/dashboard'}
+              style={({ isActive }) => ({
+                display: 'flex',
+                alignItems: 'center',
+                padding: '9px 16px',
+                color: isActive ? '#6366f1' : '#a1a1aa',
+                backgroundColor: isActive ? 'rgba(99,102,241,0.1)' : 'transparent',
+                borderLeft: isActive ? '2px solid #6366f1' : '2px solid transparent',
+                textDecoration: 'none',
+                fontSize: '14px',
+                fontWeight: isActive ? 500 : 400,
+                transition: 'color 0.15s, background-color 0.15s',
+              })}
+            >
+              {label}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Connection status */}

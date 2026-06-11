@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import initSqlJs from 'sql.js';
+import { applySaasSchema } from './saas-schema.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -71,6 +72,7 @@ export async function initDb() {
     root_cause TEXT
   )`);
 
+  applySaasSchema(db);
   saveDb();
   setInterval(saveDb, 30000);
 }

@@ -14,6 +14,11 @@ import VMsPage from './pages/VMsPage.jsx';
 import OrchestrationPage from './pages/OrchestrationPage.jsx';
 import LogsPage from './pages/LogsPage.jsx';
 import WorkspacePage from './pages/WorkspacePage.jsx';
+import MarketplacePage from './pages/saas/MarketplacePage.jsx';
+import TenantDashboard from './pages/saas/TenantDashboard.jsx';
+import IAMPage from './pages/saas/IAMPage.jsx';
+import PAMPage from './pages/saas/PAMPage.jsx';
+import OperatorPage from './pages/saas/OperatorPage.jsx';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -81,6 +86,11 @@ function AppRoutes() {
         <Route path="/orchestration" element={<OrchestrationPage />} />
         <Route path="/logs" element={<LogsPage />} />
         <Route path="/workspace" element={<WorkspacePage />} />
+        <Route path="/marketplace" element={<MarketplacePage />} />
+        <Route path="/saas" element={<TenantDashboard />} />
+        <Route path="/saas/iam" element={<IAMPage />} />
+        <Route path="/saas/pam" element={<PAMPage />} />
+        <Route path="/saas/operator" element={<OperatorPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
