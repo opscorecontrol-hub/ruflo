@@ -93,15 +93,19 @@ export async function evaluateAndScale(swarmId) {
     const vms = listVms(swarmId).filter(v => v.status !== 'terminated');
     const tasks = getAll("SELECT * FROM tasks WHERE swarm_id = ? AND status = 'queued'", [swarmId]);
 
+    // Don't scale beyond target_agent_count
+    if (agents.length >= swarm.target_agent_count) return;
+
     const policy = (() => { try { return JSON.parse(swarm.policy); } catch { return {}; } })();
-    const avgLoad = policy.simulatedLoad ?? Math.floor(Math.random() * 100);
+    // Use policy.simulatedLoad if set; otherwise derive from queue depth only — no random noise
+    const avgLoad = policy.simulatedLoad ?? (tasks.length > 0 ? 90 : 10);
 
     const decision = evaluateScaling({
       agentCount: agents.length,
       vmCount: vms.length,
       avgLoad,
       queueDepth: tasks.length,
-      policy
+      policy: { ...policy, maxAgents: swarm.target_agent_count }
     });
 
     if (decision.action === 'none') return;
