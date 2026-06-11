@@ -63,6 +63,7 @@ services:
       dockerfile: Dockerfile.opscore
       args:
         INCLUDE_DB: "false"
+        APP_BASE: "/chat"
     restart: unless-stopped
     expose:
       - "3000"
