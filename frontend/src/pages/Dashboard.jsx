@@ -84,7 +84,7 @@ export default function Dashboard() {
         return;
       }
       setShowCreate(false);
-      setNewMonitor({ name: '', url: '', interval: 60 });
+      setNewMonitor({ name: '', url: '', interval_s: 60 });
       await loadMonitors();
     } catch {
       setActionError('Network error');
