@@ -6,23 +6,33 @@ const RUFLO_MCP_URL = process.env.RUFLO_MCP_URL || 'http://ruflo-mcp-bridge:3001
 
 async function askRuflo(message, ctx) {
   try {
-    const res = await fetch(`${RUFLO_MCP_URL}/mcp/intelligence`, {
+    const ctxSummary = [
+      `Swarms: ${ctx.swarms.length} (${ctx.swarms.filter(s => s.status === 'active').length} active)`,
+      `Agents: ${ctx.agents.length} (${ctx.agents.filter(a => a.status === 'busy').length} busy)`,
+      `Monitors: ${ctx.monitors.length} (${ctx.monitors.filter(m => m.status === 'up').length} up)`,
+      `VMs: ${ctx.vms.length} (${ctx.vms.filter(v => v.status === 'running').length} running)`,
+      `Active tasks: ${ctx.tasks.length}`,
+    ].join('\n');
+
+    const res = await fetch(`${RUFLO_MCP_URL}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: crypto.randomUUID(),
-        method: 'tools/call',
-        params: {
-          name: 'intelligence__analyze',
-          arguments: { query: message, context: JSON.stringify(ctx).slice(0, 2000) }
-        }
+        model: 'gpt-4o-mini',
+        max_tokens: 400,
+        messages: [
+          {
+            role: 'system',
+            content: `You are the AI assistant for Blackbird 2030, an agent orchestration platform. Be concise and helpful. Current system state:\n${ctxSummary}`,
+          },
+          { role: 'user', content: message },
+        ],
       }),
-      signal: AbortSignal.timeout(12000)
+      signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) return null;
     const json = await res.json();
-    return json?.result?.content?.[0]?.text || null;
+    return json?.choices?.[0]?.message?.content?.trim() || null;
   } catch {
     return null;
   }
