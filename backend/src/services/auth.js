@@ -3,7 +3,8 @@ import { nanoid } from 'nanoid';
 import { writeQueue, runQuery, getOne } from '../db/init.js';
 
 export async function register(email, password, name) {
-  const existing = getOne('SELECT id FROM users WHERE email = ?', [email]);
+  const normalizedEmail = email.toLowerCase().trim();
+  const existing = getOne('SELECT id FROM users WHERE email = ?', [normalizedEmail]);
   if (existing) throw new Error('Email already registered');
 
   const id = nanoid();
@@ -13,19 +14,26 @@ export async function register(email, password, name) {
   await writeQueue(() => {
     runQuery(
       'INSERT INTO users (id, email, password_hash, name, created_at) VALUES (?, ?, ?, ?, ?)',
-      [id, email, password_hash, name || null, created_at]
+      [id, normalizedEmail, password_hash, name || null, created_at]
     );
   });
 
-  return { id, email, name: name || null };
+  return { id, email: normalizedEmail, name: name || null };
 }
 
 export async function login(email, password) {
-  const user = getOne('SELECT * FROM users WHERE email = ?', [email]);
-  if (!user) throw new Error('Invalid credentials');
+  const normalizedEmail = email.toLowerCase().trim();
+  const user = getOne('SELECT * FROM users WHERE email = ?', [normalizedEmail]);
+  if (!user) {
+    console.warn('[auth] login failed: user not found for email:', normalizedEmail);
+    throw new Error('Invalid credentials');
+  }
 
   const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) throw new Error('Invalid credentials');
+  if (!valid) {
+    console.warn('[auth] login failed: wrong password for email:', normalizedEmail);
+    throw new Error('Invalid credentials');
+  }
 
   return user;
 }
