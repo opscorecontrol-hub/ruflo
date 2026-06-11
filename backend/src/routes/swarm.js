@@ -18,9 +18,9 @@ export default async function swarmRoutes(fastify) {
   });
 
   fastify.post('/api/swarm', auth, async (request, reply) => {
-    const { name, policy, targetAgentCount } = request.body || {};
+    const { name, policy, targetAgentCount, target_agent_count } = request.body || {};
     if (!name) return reply.code(400).send({ error: 'name required' });
-    const swarm = await swarmController.createSwarm(request.user.id, { name, policy, targetAgentCount });
+    const swarm = await swarmController.createSwarm(request.user.id, { name, policy, targetAgentCount: targetAgentCount ?? target_agent_count });
     return reply.code(201).send(swarm);
   });
 
