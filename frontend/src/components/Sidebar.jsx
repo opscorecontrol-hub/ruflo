@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext.jsx';
 
 const navItems = [
+  { label: 'Workspace', path: '/workspace' },
   { label: 'Monitors', path: '/dashboard' },
   { label: 'Swarm', path: '/swarm' },
   { label: 'Agents', path: '/agents' },

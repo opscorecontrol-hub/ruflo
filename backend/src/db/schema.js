@@ -61,5 +61,14 @@ export function applySchema(db) {
   db.run(`CREATE INDEX IF NOT EXISTS idx_events_swarm ON swarm_events(swarm_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_events_created ON swarm_events(created_at)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_tasks_swarm ON tasks(swarm_id)`);
+  db.run(`CREATE TABLE IF NOT EXISTS workspace_messages (
+    id TEXT PRIMARY KEY,
+    role TEXT NOT NULL DEFAULT 'user',
+    content TEXT NOT NULL,
+    user_id TEXT,
+    created_at INTEGER
+  )`);
+
+  db.run(`CREATE INDEX IF NOT EXISTS idx_ws_msgs_created ON workspace_messages(created_at)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_checks_monitor ON checks(monitor_id)`);
 }

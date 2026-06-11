@@ -18,6 +18,7 @@ import swarmRoutes from './routes/swarm.js';
 import vmRoutes from './routes/vms.js';
 import orchestrationRoutes from './routes/orchestration.js';
 import logRoutes from './routes/logs.js';
+import workspaceRoutes from './routes/workspace.js';
 
 const fastify = Fastify({ logger: true });
 
@@ -96,6 +97,7 @@ async function buildServer() {
   await fastify.register(vmRoutes);
   await fastify.register(orchestrationRoutes);
   await fastify.register(logRoutes);
+  await fastify.register(workspaceRoutes);
 }
 
 async function start() {

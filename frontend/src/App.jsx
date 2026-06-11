@@ -13,6 +13,7 @@ import AgentDetail from './pages/AgentDetail.jsx';
 import VMsPage from './pages/VMsPage.jsx';
 import OrchestrationPage from './pages/OrchestrationPage.jsx';
 import LogsPage from './pages/LogsPage.jsx';
+import WorkspacePage from './pages/WorkspacePage.jsx';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -79,6 +80,7 @@ function AppRoutes() {
         <Route path="/vms" element={<VMsPage />} />
         <Route path="/orchestration" element={<OrchestrationPage />} />
         <Route path="/logs" element={<LogsPage />} />
+        <Route path="/workspace" element={<WorkspacePage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
