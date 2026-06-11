@@ -92,6 +92,24 @@ export function applySaasSchema(db) {
 
   db.run(`CREATE INDEX IF NOT EXISTS idx_audit_tenant ON saas_audit_log(tenant_id, created_at)`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS saas_engagements (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    target TEXT NOT NULL,
+    test_type TEXT NOT NULL DEFAULT 'web',
+    scope TEXT,
+    out_of_scope TEXT,
+    start_date TEXT,
+    end_date TEXT,
+    status TEXT NOT NULL DEFAULT 'scoping',
+    risk_level TEXT DEFAULT 'medium',
+    repo_slug TEXT,
+    findings_count INTEGER DEFAULT 0,
+    created_by TEXT,
+    created_at INTEGER
+  )`);
+
   // Seed default service catalog if empty
   const existing = db.exec("SELECT COUNT(*) as n FROM saas_services");
   if (existing?.[0]?.values?.[0]?.[0] === 0) {
@@ -101,6 +119,7 @@ export function applySaasSchema(db) {
       ['svc-crowdsec', 'crowdsec', 'CrowdSec', 'Open-source crowdsourced security threat detection', '🛡️', 'security'],
       ['svc-decepticon', 'decepticon', 'Decepticon', 'Deception technology — honeypots and threat traps', '🪤', 'security'],
       ['svc-purple-ai', 'purple-ai', 'Purple AI', 'AI-powered purple team security intelligence', '🤖', 'ai'],
+      ['svc-ethicalhacker', 'ethical-hacker', 'Ethical Hacker', 'On-demand penetration testing with structured GitHub deliverables', '🔐', 'security'],
     ];
     services.forEach(([id, name, display_name, description, icon, category]) => {
       try {
@@ -133,6 +152,7 @@ export function applySaasSchema(db) {
       ['plan-enterprise', 'svc-crowdsec', 1],
       ['plan-enterprise', 'svc-decepticon', 1],
       ['plan-enterprise', 'svc-purple-ai', 1],
+      ['plan-enterprise', 'svc-ethicalhacker', 1],
     ];
     planServices.forEach(([plan_id, service_id, quantity]) => {
       try {

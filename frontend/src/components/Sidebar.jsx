@@ -13,6 +13,7 @@ const navItems = [
   { label: '─', path: null, divider: true },
   { label: 'Marketplace', path: '/marketplace' },
   { label: 'My Services', path: '/saas' },
+  { label: 'Engagements', path: '/saas/engagements' },
   { label: 'Users (IAM)', path: '/saas/iam' },
   { label: 'Roles (PAM)', path: '/saas/pam' },
   { label: 'Operator', path: '/saas/operator', operatorOnly: true },

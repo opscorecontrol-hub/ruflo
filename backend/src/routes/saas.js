@@ -389,4 +389,71 @@ export default async function saasRoutes(fastify) {
     });
     return planWithServices(getOne('SELECT * FROM saas_plans WHERE id = ?', [planId]));
   });
+
+  // ── Engagements (Ethical Hacker) ────────────────────────────────────────────
+
+  fastify.get('/api/saas/engagements', auth, async (request, reply) => {
+    let tenantId;
+    if (isOperator(request)) {
+      tenantId = request.query.tenant_id; // optional filter
+    } else {
+      const m = getTenantMembership(request.user.id);
+      if (!m) return reply.code(403).send({ error: 'No tenant membership' });
+      tenantId = m.tenant_id;
+    }
+    const sql = tenantId
+      ? 'SELECT * FROM saas_engagements WHERE tenant_id = ? ORDER BY created_at DESC'
+      : 'SELECT * FROM saas_engagements ORDER BY created_at DESC LIMIT 100';
+    return getAll(sql, tenantId ? [tenantId] : []);
+  });
+
+  fastify.post('/api/saas/engagements', auth, async (request, reply) => {
+    const m = isOperator(request) ? null : getTenantMembership(request.user.id);
+    if (!isOperator(request) && !m) return reply.code(403).send({ error: 'No tenant membership' });
+    const tenantId = m?.tenant_id || request.body?.tenant_id;
+    if (!tenantId) return reply.code(400).send({ error: 'tenant_id required' });
+
+    const { name, target, test_type = 'web', scope, out_of_scope, start_date, end_date, risk_level = 'medium' } = request.body || {};
+    if (!name?.trim()) return reply.code(400).send({ error: 'name required' });
+    if (!target?.trim()) return reply.code(400).send({ error: 'target required' });
+
+    const id = nanoid();
+    const repo_slug = `pentest-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)}-${id.slice(0, 6)}`;
+    const now = Date.now();
+    await writeQueue(() => {
+      runQuery(
+        'INSERT INTO saas_engagements (id, tenant_id, name, target, test_type, scope, out_of_scope, start_date, end_date, status, risk_level, repo_slug, findings_count, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,?,?)',
+        [id, tenantId, name.trim(), target.trim(), test_type, scope || null, out_of_scope || null, start_date || null, end_date || null, 'scoping', risk_level, repo_slug, request.user.id, now]
+      );
+    });
+    auditLog(tenantId, request.user.id, 'engagement.created', 'engagement', id, { name, test_type, target });
+    return reply.code(201).send(getOne('SELECT * FROM saas_engagements WHERE id = ?', [id]));
+  });
+
+  fastify.put('/api/saas/engagements/:id', auth, async (request, reply) => {
+    const eng = getOne('SELECT * FROM saas_engagements WHERE id = ?', [request.params.id]);
+    if (!eng) return reply.code(404).send({ error: 'Not found' });
+    const m = isOperator(request) ? null : getTenantMembership(request.user.id);
+    if (!isOperator(request) && m?.tenant_id !== eng.tenant_id) return reply.code(403).send({ error: 'Forbidden' });
+
+    const { name, target, test_type, scope, out_of_scope, start_date, end_date, status, risk_level } = request.body || {};
+    await writeQueue(() => {
+      runQuery(
+        'UPDATE saas_engagements SET name=COALESCE(?,name), target=COALESCE(?,target), test_type=COALESCE(?,test_type), scope=COALESCE(?,scope), out_of_scope=COALESCE(?,out_of_scope), start_date=COALESCE(?,start_date), end_date=COALESCE(?,end_date), status=COALESCE(?,status), risk_level=COALESCE(?,risk_level) WHERE id=?',
+        [name||null, target||null, test_type||null, scope||null, out_of_scope||null, start_date||null, end_date||null, status||null, risk_level||null, request.params.id]
+      );
+    });
+    auditLog(eng.tenant_id, request.user.id, 'engagement.updated', 'engagement', eng.id);
+    return getOne('SELECT * FROM saas_engagements WHERE id = ?', [request.params.id]);
+  });
+
+  fastify.delete('/api/saas/engagements/:id', auth, async (request, reply) => {
+    const eng = getOne('SELECT * FROM saas_engagements WHERE id = ?', [request.params.id]);
+    if (!eng) return reply.code(404).send({ error: 'Not found' });
+    const m = isOperator(request) ? null : getTenantMembership(request.user.id);
+    if (!isOperator(request) && m?.tenant_id !== eng.tenant_id) return reply.code(403).send({ error: 'Forbidden' });
+    await writeQueue(() => runQuery('DELETE FROM saas_engagements WHERE id = ?', [request.params.id]));
+    auditLog(eng.tenant_id, request.user.id, 'engagement.deleted', 'engagement', eng.id);
+    return reply.code(204).send();
+  });
 }

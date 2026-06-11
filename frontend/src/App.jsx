@@ -19,6 +19,7 @@ import TenantDashboard from './pages/saas/TenantDashboard.jsx';
 import IAMPage from './pages/saas/IAMPage.jsx';
 import PAMPage from './pages/saas/PAMPage.jsx';
 import OperatorPage from './pages/saas/OperatorPage.jsx';
+import EngagementPage from './pages/saas/EngagementPage.jsx';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -91,6 +92,7 @@ function AppRoutes() {
         <Route path="/saas/iam" element={<IAMPage />} />
         <Route path="/saas/pam" element={<PAMPage />} />
         <Route path="/saas/operator" element={<OperatorPage />} />
+        <Route path="/saas/engagements" element={<EngagementPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

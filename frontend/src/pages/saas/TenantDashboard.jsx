@@ -111,6 +111,18 @@ export default function TenantDashboard() {
         )}
       </div>
 
+      {/* Engagements quicklink */}
+      <div style={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <span style={{ fontSize: '24px' }}>🔐</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '14px', fontWeight: 600, color: '#e4e4e7' }}>Ethical Hacker Engagements</div>
+          <div style={{ fontSize: '12px', color: '#71717a', marginTop: '2px' }}>Commission penetration tests with structured GitHub deliverables</div>
+        </div>
+        <Link to="/saas/engagements" style={{ padding: '7px 16px', backgroundColor: '#6366f1', borderRadius: '6px', color: '#fff', fontSize: '13px', fontWeight: 500, textDecoration: 'none' }}>
+          View Engagements →
+        </Link>
+      </div>
+
       {/* Members preview */}
       {isTenantAdmin && data?.members && (
         <div>
