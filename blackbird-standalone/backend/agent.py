@@ -1,6 +1,7 @@
 """Core agent loop: plan → research → code → save files."""
 import asyncio
 import json
+import logging
 import os
 import re
 import time
@@ -10,6 +11,8 @@ from nanoid import generate as nanoid
 import db
 import providers
 import search as search_mod
+
+logger = logging.getLogger(__name__)
 
 PLAN_SYSTEM = """You are an expert AI software engineer.
 Given a project goal, create a concise step-by-step plan.
@@ -107,6 +110,7 @@ async def run_agent(
                     })
 
             except Exception as e:
+                logger.error("run %s step %s error: %s", run_id, sid, e)
                 await db.update_step(sid, 'error', {'error': str(e)})
                 await emit('step_status', {'id': sid, 'step_id': step['id'], 'status': 'error', 'result': str(e)})
                 # Non-fatal — continue with remaining steps
@@ -122,9 +126,11 @@ async def run_agent(
         })
 
     except providers.ProviderError as e:
+        logger.error("run %s provider error: %s", run_id, e)
         await db.update_run_status(run_id, 'error')
         await emit('error', {'message': f"Provider error: {e}", 'run_id': run_id})
     except Exception as e:
+        logger.exception("run %s unexpected error", run_id)
         await db.update_run_status(run_id, 'error')
         await emit('error', {'message': str(e), 'run_id': run_id})
     finally:

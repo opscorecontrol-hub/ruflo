@@ -85,7 +85,7 @@ async def list_projects():
 
 @app.post('/api/projects', status_code=201)
 async def create_project(body: ProjectCreate):
-    id = nanoid(10)
+    id = nanoid(size=10)
     path = os.path.join(PROJECTS_ROOT, id)
     os.makedirs(path, exist_ok=True)
     return await db.create_project(id, body.name, body.description, path)
@@ -104,7 +104,7 @@ async def get_messages(project_id: str):
 
 @app.post('/api/projects/{project_id}/messages', status_code=201)
 async def post_message(project_id: str, body: MessageCreate):
-    msg = await db.add_message(nanoid(10), project_id, body.role, body.content)
+    msg = await db.add_message(nanoid(size=10), project_id, body.role, body.content)
     return msg
 
 
@@ -150,7 +150,7 @@ async def start_run(project_id: str, body: RunCreate):
     if not project:
         raise HTTPException(404, 'Project not found')
 
-    run_id = nanoid(12)
+    run_id = nanoid(size=12)
     settings = await db.get_settings()
 
     await db.create_run(run_id, project_id, body.goal, body.model)
