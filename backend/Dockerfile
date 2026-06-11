@@ -7,9 +7,9 @@ RUN npm ci --production
 
 COPY src/ ./src/
 
-RUN mkdir -p /data
+RUN mkdir -p /app/data
 
-VOLUME ["/data"]
+VOLUME ["/app/data"]
 
 EXPOSE 3003
 
