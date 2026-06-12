@@ -277,9 +277,19 @@
         "mcp",
         "start"
       ]
+    },
+    "flow-nexus": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "flow-nexus@latest",
+        "mcp",
+        "start"
+      ]
     }
   },
   "enabledMcpjsonServers": [
-    "claude-flow"
+    "claude-flow",
+    "flow-nexus"
   ]
 }
