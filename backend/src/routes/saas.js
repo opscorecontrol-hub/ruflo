@@ -398,7 +398,8 @@ export default async function saasRoutes(fastify) {
       tenantId = request.query.tenant_id; // optional filter
     } else {
       const m = getTenantMembership(request.user.id);
-      if (!m) return reply.code(403).send({ error: 'No tenant membership' });
+      // No tenant yet — return empty list (tenant will be created on first POST)
+      if (!m) return [];
       tenantId = m.tenant_id;
     }
     const sql = tenantId
@@ -408,8 +409,28 @@ export default async function saasRoutes(fastify) {
   });
 
   fastify.post('/api/saas/engagements', auth, async (request, reply) => {
-    const m = isOperator(request) ? null : getTenantMembership(request.user.id);
-    if (!isOperator(request) && !m) return reply.code(403).send({ error: 'No tenant membership' });
+    let m = isOperator(request) ? null : getTenantMembership(request.user.id);
+
+    // Auto-provision a personal tenant for users who have none yet
+    if (!isOperator(request) && !m) {
+      const userId = request.user.id;
+      const userName = (request.user.name || request.user.email || 'User').split('@')[0];
+      const tenantId = nanoid();
+      const slug = `personal-${userId.slice(0, 8).toLowerCase()}`;
+      const now = Date.now();
+      await writeQueue(() => {
+        runQuery(
+          'INSERT OR IGNORE INTO saas_tenants (id, name, slug, status, plan_id, created_at) VALUES (?,?,?,?,?,?)',
+          [tenantId, `${userName}'s Workspace`, slug, 'active', 'free', now]
+        );
+        runQuery(
+          'INSERT OR IGNORE INTO saas_tenant_members (id, tenant_id, user_id, role, created_at) VALUES (?,?,?,?,?)',
+          [nanoid(), tenantId, userId, 'admin', now]
+        );
+      });
+      m = getTenantMembership(userId);
+    }
+
     const tenantId = m?.tenant_id || request.body?.tenant_id;
     if (!tenantId) return reply.code(400).send({ error: 'tenant_id required' });
 
