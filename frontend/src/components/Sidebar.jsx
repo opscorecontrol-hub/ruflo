@@ -11,6 +11,8 @@ const navItems = [
   { label: 'Orchestration', path: '/orchestration' },
   { label: 'Logs', path: '/logs' },
   { label: '─', path: null, divider: true },
+  { label: 'Ruflo Chat', path: '/chat/', external: true },
+  { label: '─', path: null, divider: true },
   { label: 'Marketplace', path: '/marketplace' },
   { label: 'My Services', path: '/saas' },
   { label: 'Engagements', path: '/saas/engagements' },
@@ -68,10 +70,34 @@ export default function Sidebar() {
           overflowY: 'auto',
         }}
       >
-        {navItems.map(({ label, path, divider, operatorOnly }) => {
+        {navItems.map(({ label, path, divider, operatorOnly, external }) => {
           if (operatorOnly && !isOperator) return null;
           if (divider) return (
             <div key={label} style={{ height: '1px', backgroundColor: '#27272a', margin: '6px 12px' }} />
+          );
+          if (external) return (
+            <a
+              key={path}
+              href={path}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '9px 16px',
+                color: '#a1a1aa',
+                textDecoration: 'none',
+                fontSize: '14px',
+                fontWeight: 400,
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = '#6366f1'}
+              onMouseLeave={e => e.currentTarget.style.color = '#a1a1aa'}
+            >
+              {label}
+              <span style={{ fontSize: '10px', opacity: 0.5 }}>↗</span>
+            </a>
           );
           return (
             <NavLink

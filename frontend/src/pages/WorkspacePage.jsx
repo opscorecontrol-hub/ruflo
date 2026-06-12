@@ -578,7 +578,7 @@ export default function WorkspacePage() {
 
   const [mapData, setMapData] = useState({ swarms: [], agents: [] });
   const [vms, setVms] = useState([]);
-  const [rightTab, setRightTab] = useState('ai-desktop');
+  const [rightTab, setRightTab] = useState('ruflo-chat');
   const [termLines, setTermLines] = useState([]);
 
   const [activeTab, setActiveTab] = useState('workspace.js');
@@ -962,6 +962,7 @@ export default function WorkspacePage() {
             flexShrink: 0,
           }}>
             {[
+              { id: 'ruflo-chat', label: 'Ruflo Chat' },
               { id: 'ai-desktop', label: 'AI Desktop' },
               { id: 'vm-console', label: 'VMs', badge: vms.length || null },
               { id: 'logs', label: 'Logs' },
@@ -1015,6 +1016,22 @@ export default function WorkspacePage() {
               </div>
             )}
           </div>
+
+          {/* Ruflo Chat iframe */}
+          {rightTab === 'ruflo-chat' && (
+            <iframe
+              src="/chat/"
+              title="Ruflo Chat"
+              style={{
+                flex: 1,
+                border: 'none',
+                width: '100%',
+                height: '100%',
+                backgroundColor: '#0a0a0f',
+              }}
+              allow="microphone"
+            />
+          )}
 
           {/* AI Desktop */}
           {rightTab === 'ai-desktop' && (
