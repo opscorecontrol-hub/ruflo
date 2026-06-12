@@ -25,6 +25,12 @@ services:
       - mongo-data:/data/db
     environment:
       MONGO_INITDB_DATABASE: ${MONGODB_DB_NAME:-chat-db}
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
       - blackbird-net
 
@@ -84,7 +90,7 @@ services:
         COOKIE_SAMESITE=lax
     depends_on:
       mongodb:
-        condition: service_started
+        condition: service_healthy
       ruflo-mcp-bridge:
         condition: service_healthy
     networks:
